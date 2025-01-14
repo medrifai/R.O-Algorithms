@@ -62,6 +62,20 @@ class GraphAlgorithms:
             return flow_value, flow_dict, cut_value, partition
         except nx.NetworkXError:
             raise ValueError("Le graphe doit être dirigé avec des capacités valides")
+        
+    @staticmethod
+    def bellman_ford(G: nx.DiGraph, start: str, end: str) -> Tuple[list, float]:
+        """
+        Implémentation de l'algorithme de Bellman-Ford pour trouver le plus court chemin.
+        """
+        try:
+            length, path = nx.single_source_bellman_ford(G, source=start, target=end)
+            return path, length
+        except nx.NetworkXUnbounded:
+            raise ValueError("Le graphe contient un cycle de poids négatif.")
+        except nx.NetworkXError:
+            raise ValueError("Erreur dans les données du graphe. Vérifiez les sommets et les arêtes.")
+
 
     @staticmethod
     def potentiel_metra(tasks: Dict[int, Dict]) -> Tuple[Dict[int, int], int]:
@@ -123,14 +137,14 @@ class GraphAlgorithms:
             # Assurer la connexité avec des poids
             for i in range(num_vertices - 1):
                 weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
-                                     GRAPH_SETTINGS['MAX_WEIGHT'])
+                                    GRAPH_SETTINGS['MAX_WEIGHT'])
                 G.add_edge(f'X{i}', f'X{i+1}', weight=weight)
             # Ajouter des arêtes supplémentaires
             for i in range(num_vertices):
                 for j in range(i + 2, num_vertices):
                     if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
                         weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
-                                             GRAPH_SETTINGS['MAX_WEIGHT'])
+                                            GRAPH_SETTINGS['MAX_WEIGHT'])
                         G.add_edge(f'X{i}', f'X{j}', weight=weight)
             return G
 
@@ -148,6 +162,24 @@ class GraphAlgorithms:
                     if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
                         capacity = random.randint(1, 20)
                         G.add_edge(i, j, capacity=capacity)
+            return G
+
+        elif algorithm_type == "bellman_ford":
+            G = nx.Graph()
+            for i in range(num_vertices):
+                G.add_node(f'X{i}')
+            # Assurer la connexité avec des poids
+            for i in range(num_vertices - 1):
+                weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
+                                    GRAPH_SETTINGS['MAX_WEIGHT'])
+                G.add_edge(f'X{i}', f'X{i+1}', weight=weight)
+            # Ajouter des arêtes supplémentaires
+            for i in range(num_vertices):
+                for j in range(i + 2, num_vertices):
+                    if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
+                        weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
+                                            GRAPH_SETTINGS['MAX_WEIGHT'])
+                        G.add_edge(f'X{i}', f'X{j}', weight=weight)
             return G
 
         raise ValueError(f"Type d'algorithme non supporté: {algorithm_type}")

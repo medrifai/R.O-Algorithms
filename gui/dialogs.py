@@ -121,6 +121,73 @@ class DijkstraDialog(BaseDialog):
 
         except ValueError as e:
             messagebox.showerror("Erreur", str(e))
+            
+class BellmanFordDialog(BaseDialog):
+    def __init__(self, parent):
+        super().__init__(parent, "Bellman-Ford - Paramètres")
+
+    def setup_ui(self):
+        # Nombre de sommets
+        tk.Label(
+            self.dialog,
+            text="Nombre de sommets:",
+            bg=GUI_SETTINGS['BACKGROUND_COLOR']
+        ).pack(pady=10)
+        self.vertices_entry = tk.Entry(self.dialog)
+        self.vertices_entry.pack(pady=5)
+
+        # Sommet de départ
+        tk.Label(
+            self.dialog,
+            text="Sommet de départ (X0, X1, ...):",
+            bg=GUI_SETTINGS['BACKGROUND_COLOR']
+        ).pack(pady=10)
+        self.start_entry = tk.Entry(self.dialog)
+        self.start_entry.pack(pady=5)
+
+        # Sommet d'arrivée
+        tk.Label(
+            self.dialog,
+            text="Sommet d'arrivée (X0, X1, ...):",
+            bg=GUI_SETTINGS['BACKGROUND_COLOR']
+        ).pack(pady=10)
+        self.end_entry = tk.Entry(self.dialog)
+        self.end_entry.pack(pady=5)
+
+        # Bouton de génération
+        tk.Button(
+            self.dialog,
+            text="Générer",
+            command=self.generate_graph
+        ).pack(pady=20)
+
+    def generate_graph(self):
+        try:
+            num_vertices = int(self.vertices_entry.get())
+            if num_vertices <= 0:
+                raise ValueError(ERROR_MESSAGES['invalid_vertices'])
+
+            start_node = self.start_entry.get()
+            end_node = self.end_entry.get()
+
+            if not start_node.startswith('X') or not end_node.startswith('X'):
+                raise ValueError(ERROR_MESSAGES['invalid_node_format'])
+
+            start_index = int(start_node[1:])
+            end_index = int(end_node[1:])
+
+            if start_index >= num_vertices or end_index >= num_vertices:
+                raise ValueError(ERROR_MESSAGES['invalid_node_index'])
+
+            G = GraphAlgorithms.generate_random_graph(num_vertices, "bellman_ford")
+            path, path_length = GraphAlgorithms.bellman_ford(G, start_node, end_node)
+
+            visualizer = GraphVisualizer()
+            visualizer.display_bellman_ford(G, path, path_length)
+            self.dialog.destroy()
+
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
 
 class KruskalDialog(BaseDialog):
     def __init__(self, parent):
@@ -303,6 +370,6 @@ class TransportDialog(BaseDialog):
             visualizer = GraphVisualizer()
             visualizer.display_transport_solution(supply, demand, costs, solution, total_cost, method_name)
             self.dialog.destroy()
-
+        #hhhh
         except ValueError as e:
             messagebox.showerror("Erreur", str(e))

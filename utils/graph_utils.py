@@ -90,6 +90,65 @@ class GraphVisualizer:
         info_text = f"Coût total de l'arbre couvrant minimal: {total_weight}"
         self._add_info_and_close(main_frame, info_text)
 
+    def display_bellman_ford(self, G, distances, predecessors):
+        main_frame = self._create_window("Plus court chemin - Bellman-Ford")
+        pos = nx.spring_layout(G)
+        
+        # Dessin des arêtes du graphe
+        nx.draw_networkx_edges(G, pos, alpha=0.2)
+        nx.draw_networkx_nodes(G, pos, node_size=GRAPH_SETTINGS['NODE_SIZE'],
+                            node_color=ALGORITHM_COLORS['bellman_ford']['node_default'])
+        
+        # Vérification et conversion des données si nécessaire
+        if isinstance(distances, list):
+            distances_dict = {i: dist for i, dist in enumerate(distances)}
+        else:
+            distances_dict = distances
+            
+        if not isinstance(predecessors, dict):
+            if isinstance(predecessors, list):
+                predecessors_dict = {i: pred for i, pred in enumerate(predecessors) if pred is not None}
+            else:
+                predecessors_dict = {}
+        else:
+            predecessors_dict = predecessors
+        
+        # Affichage des chemins les plus courts
+        for node in G.nodes:
+            if node in predecessors_dict:
+                path = []
+                current_node = node
+                
+                # Remonter les prédécesseurs jusqu'à la source
+                while current_node is not None and current_node in predecessors_dict:
+                    path.append(current_node)
+                    current_node = predecessors_dict.get(current_node)
+                if current_node is not None:
+                    path.append(current_node)
+                path.reverse()
+                
+                # Affichage des arêtes du chemin le plus court
+                if len(path) > 1:
+                    path_edges = list(zip(path[:-1], path[1:]))
+                    nx.draw_networkx_edges(G, pos, edgelist=path_edges,
+                                        edge_color=ALGORITHM_COLORS['bellman_ford']['path_highlight'],
+                                        width=GRAPH_SETTINGS['EDGE_WIDTH'])
+        
+        # Dessiner les étiquettes des noeuds
+        nx.draw_networkx_labels(G, pos)
+        
+        # Affichage des poids des arêtes
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels)
+        
+        # Texte d'information sur les distances
+        info_text = "Distances minimales depuis la source :\n"
+        for node, dist in distances_dict.items():
+            info_text += f"{node}: {dist}\n"
+        
+        self._add_info_and_close(main_frame, info_text)
+
+
     def display_ford_fulkerson(self, G, flow_dict, flow_value, partition):
         main_frame = self._create_window("Flot maximum - Ford-Fulkerson")
         pos = nx.spring_layout(G)

@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from config.settings import GUI_SETTINGS
-from gui.dialogs import (WelshPowellDialog, DijkstraDialog, KruskalDialog,
+from gui.dialogs import (BellmanFordDialog, WelshPowellDialog, DijkstraDialog, KruskalDialog,
                         FordFulkersonDialog, PotentielMetraDialog,
                         TransportDialog)
 
@@ -102,6 +102,7 @@ class GraphApp:
             "Welsh Powell": lambda: WelshPowellDialog(self.root),
             "Dijkstra": lambda: DijkstraDialog(self.root),
             "Kruskal": lambda: KruskalDialog(self.root),
+            "Bellman ford": lambda: BellmanFordDialog(self.root),
             "Ford Fulkerson": lambda: FordFulkersonDialog(self.root),
             "Potentiel METRA": lambda: PotentielMetraDialog(self.root),
             "Nord-Ouest": lambda: TransportDialog(self.root, "nord_ouest"),

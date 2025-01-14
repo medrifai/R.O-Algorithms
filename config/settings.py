@@ -48,6 +48,11 @@ ALGORITHM_COLORS = {
         'edge_default': 'gray',
         'critical_path': 'red',
         'task_bar': 'lightblue'
+    },
+    'bellman_ford': {
+        'node_default': 'lightblue',
+        'edge_default': 'gray',
+        'mst_highlight': 'red'
     }
 }
 
