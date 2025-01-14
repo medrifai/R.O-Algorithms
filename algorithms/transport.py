@@ -1,222 +1,180 @@
 import numpy as np
+from typing import List, Set, Tuple, Dict
 
-def nord_ouest(supply, demand):
-    """
-    Méthode du coin Nord-Ouest pour résoudre le problème de transport initial.
-    
-    Args:
-        supply: Liste des capacités des sources
-        demand: Liste des demandes des destinations
-    
-    Returns:
-        np.array: Matrice de la solution initiale
-    """
-    supply = np.array(supply, dtype=float)
-    demand = np.array(demand, dtype=float)
-    m, n = len(supply), len(demand)
-    solution = np.zeros((m, n))
-    
-    i, j = 0, 0
-    while i < m and j < n:
-        # Prendre le minimum entre l'offre disponible et la demande restante
-        quantity = min(supply[i], demand[j])
-        solution[i, j] = quantity
-        
-        # Mettre à jour l'offre et la demande
-        supply[i] -= quantity
-        demand[j] -= quantity
-        
-        # Passer à la ligne suivante si l'offre est épuisée
-        if supply[i] <= 0:
-            i += 1
-        # Passer à la colonne suivante si la demande est satisfaite
-        if demand[j] <= 0:
-            j += 1
-    
-    return solution
+class TransportAlgorithms:
+    @staticmethod
+    def nord_ouest(supply: List[int], demand: List[int], costs: List[List[int]]) -> Tuple[List[List[int]], int]:
+        """
+        Implémentation corrigée de la méthode du coin Nord-Ouest.
+        """
+        if sum(supply) != sum(demand):
+            raise ValueError("L'offre totale doit être égale à la demande totale")
 
-def moindre_cout(supply, demand, costs):
-    """
-    Méthode du coût minimum pour résoudre le problème de transport.
-    
-    Args:
-        supply: Liste des capacités des sources
-        demand: Liste des demandes des destinations
-        costs: Matrice des coûts de transport
-    
-    Returns:
-        np.array: Matrice de la solution
-    """
-    supply = np.array(supply, dtype=float)
-    demand = np.array(demand, dtype=float)
-    costs = np.array(costs, dtype=float)
-    m, n = len(supply), len(demand)
-    solution = np.zeros((m, n))
-    
-    while True:
-        # Vérifier s'il reste de l'offre et de la demande
-        if np.all(supply <= 0) or np.all(demand <= 0):
-            break
+        m, n = len(supply), len(demand)
+        allocation = [[0 for _ in range(n)] for _ in range(m)]
+        total_cost = 0
         
-        # Trouver la cellule avec le coût minimum parmi les cellules valides
-        valid_mask = (supply.reshape(-1, 1) > 0) & (demand.reshape(1, -1) > 0)
-        if not np.any(valid_mask):
-            break
+        i, j = 0, 0
+        supply_temp = supply.copy()
+        demand_temp = demand.copy()
+        
+        while i < m and j < n:
+            quantity = min(supply_temp[i], demand_temp[j])
+            allocation[i][j] = quantity
+            total_cost += quantity * costs[i][j]
             
-        costs_masked = np.where(valid_mask, costs, np.inf)
-        i, j = np.unravel_index(np.argmin(costs_masked), costs_masked.shape)
-        
-        # Affecter la quantité maximum possible
-        quantity = min(supply[i], demand[j])
-        solution[i, j] = quantity
-        
-        # Mettre à jour l'offre et la demande
-        supply[i] -= quantity
-        demand[j] -= quantity
-    
-    return solution
-
-def stepping_stone(initial_solution, costs):
-    """
-    Méthode du Stepping Stone pour optimiser une solution de transport.
-    
-    Args:
-        initial_solution: Solution initiale
-        costs: Matrice des coûts de transport
-    
-    Returns:
-        np.array: Solution optimisée
-        float: Coût total de la solution
-    """
-    solution = initial_solution.copy()
-    m, n = solution.shape
-    
-    def find_cycle(start_i, start_j):
-        """Trouve un cycle pour une cellule vide"""
-        def find_path(current_i, current_j, used_rows, used_cols, path):
-            # Si on revient au point de départ avec un cycle valide
-            if len(path) > 3 and current_i == start_i and current_j == start_j:
-                return path
+            supply_temp[i] -= quantity
+            demand_temp[j] -= quantity
             
-            # Explorer les possibilités horizontalement
-            for j in range(n):
-                if j != current_j and (solution[current_i, j] > 0 or (current_i == start_i and j == start_j)):
-                    if j not in used_cols:
-                        # Explorer verticalement depuis ce nouveau point
-                        for i in range(m):
-                            if i != current_i and (solution[i, j] > 0 or (i == start_i and j == start_j)):
-                                if i not in used_rows:
-                                    new_path = find_path(i, j, 
-                                                       used_rows | {current_i}, 
-                                                       used_cols | {current_j}, 
-                                                       path + [(current_i, j), (i, j)])
-                                    if new_path:
-                                        return new_path
-            return None
+            if supply_temp[i] == 0:
+                i += 1
+            if demand_temp[j] == 0:
+                j += 1
+                
+        return allocation, total_cost
+
+    @staticmethod
+    def moindre_cout(supply: List[int], demand: List[int], costs: List[List[int]]) -> Tuple[List[List[int]], int]:
+        """
+        Implémentation corrigée de la méthode du coût minimum.
+        """
+        if sum(supply) != sum(demand):
+            raise ValueError("L'offre totale doit être égale à la demande totale")
+
+        m, n = len(supply), len(demand)
+        allocation = [[0 for _ in range(n)] for _ in range(m)]
+        total_cost = 0
         
-        # Commencer la recherche
-        for j in range(n):
-            if j != start_j and solution[start_i, j] > 0:
-                path = find_path(start_i, j, {start_i}, {start_j}, [(start_i, start_j), (start_i, j)])
-                if path:
-                    return path
-        return None
-    
-    while True:
-        improvement_found = False
-        best_improvement = 0
-        best_cycle = None
+        supply_temp = supply.copy()
+        demand_temp = demand.copy()
         
-        # Chercher la meilleure amélioration possible
-        for i in range(m):
-            for j in range(n):
-                if solution[i, j] == 0:
-                    cycle = find_cycle(i, j)
-                    if cycle:
-                        # Calculer l'amélioration potentielle
-                        cycle_cost = 0
-                        for idx, (ci, cj) in enumerate(cycle):
-                            cycle_cost += costs[ci, cj] * (-1 if idx % 2 else 1)
+        while True:
+            # Trouver la cellule avec le coût minimum parmi les cellules disponibles
+            min_cost = float('inf')
+            min_i, min_j = -1, -1
+            
+            for i in range(m):
+                if supply_temp[i] == 0:
+                    continue
+                for j in range(n):
+                    if demand_temp[j] == 0:
+                        continue
+                    if costs[i][j] < min_cost:
+                        min_cost = costs[i][j]
+                        min_i, min_j = i, j
+            
+            if min_i == -1:  # Toutes les allocations sont faites
+                break
+                
+            quantity = min(supply_temp[min_i], demand_temp[min_j])
+            allocation[min_i][min_j] = quantity
+            total_cost += quantity * costs[min_i][min_j]
+            
+            supply_temp[min_i] -= quantity
+            demand_temp[min_j] -= quantity
+            
+        return allocation, total_cost
+
+    @staticmethod
+    def stepping_stone(initial_solution: List[List[int]], 
+                      costs: List[List[int]]) -> Tuple[List[List[int]], int]:
+        """
+        Implémentation corrigée de la méthode du Stepping Stone.
+        """
+        m, n = len(initial_solution), len(initial_solution[0])
+        current_solution = [row[:] for row in initial_solution]
+        
+        while True:
+            # Calculer les coûts réduits pour les cellules non utilisées
+            best_improvement = 0
+            best_path = None
+            
+            for i in range(m):
+                for j in range(n):
+                    if current_solution[i][j] == 0:
+                        # Trouver un cycle pour cette cellule
+                        path = TransportAlgorithms._find_cycle(current_solution, i, j)
+                        if path is None:
+                            continue
                             
-                        if cycle_cost < best_improvement:
-                            best_improvement = cycle_cost
-                            best_cycle = cycle
-                            improvement_found = True
-        
-        # Si aucune amélioration n'est trouvée, on arrête
-        if not improvement_found:
-            break
+                        # Calculer l'amélioration potentielle
+                        improvement = 0
+                        sign = 1
+                        for pi, pj in path:
+                            improvement += sign * costs[pi][pj]
+                            sign *= -1
+                            
+                        if improvement < best_improvement:
+                            best_improvement = improvement
+                            best_path = path
             
-        # Appliquer la meilleure amélioration trouvée
-        # Trouver la quantité maximum qu'on peut déplacer
-        max_quantity = float('inf')
-        for idx, (i, j) in enumerate(best_cycle):
-            if idx % 2:  # Pour les cellules négatives du cycle
-                max_quantity = min(max_quantity, solution[i, j])
+            if best_improvement >= 0:  # Pas d'amélioration possible
+                break
                 
-        # Appliquer le changement
-        for idx, (i, j) in enumerate(best_cycle):
-            solution[i, j] += max_quantity * (-1 if idx % 2 else 1)
-    
-    # Calculer le coût total de la solution
-    total_cost = np.sum(solution * costs)
-    
-    return solution, total_cost
+            # Appliquer l'amélioration
+            min_quantity = float('inf')
+            for idx, (i, j) in enumerate(best_path):
+                if idx % 2 == 1:  # Cellules négatives dans le cycle
+                    min_quantity = min(min_quantity, current_solution[i][j])
+                    
+            sign = 1
+            for i, j in best_path:
+                current_solution[i][j] += sign * min_quantity
+                sign *= -1
+        
+        # Calculer le coût total
+        total_cost = sum(current_solution[i][j] * costs[i][j]
+                        for i in range(m)
+                        for j in range(n))
+                        
+        return current_solution, total_cost
 
-def vogel(supply, demand, costs):
-    """
-    Méthode d'approximation de Vogel pour le problème de transport.
-    
-    Args:
-        supply: Liste des capacités des sources
-        demand: Liste des demandes des destinations
-        costs: Matrice des coûts de transport
-    
-    Returns:
-        np.array: Matrice de la solution
-    """
-    supply = np.array(supply, dtype=float)
-    demand = np.array(demand, dtype=float)
-    costs = np.array(costs, dtype=float)
-    m, n = len(supply), len(demand)
-    solution = np.zeros((m, n))
-    
-    while np.any(supply > 0) and np.any(demand > 0):
-        # Calculer les pénalités pour chaque ligne et colonne
-        penalties = np.zeros(m + n)
+    @staticmethod
+    def _find_cycle(solution: List[List[int]], start_i: int, start_j: int) -> List[Tuple[int, int]]:
+        """
+        Trouve un cycle pour la méthode du Stepping Stone.
+        """
+        m, n = len(solution), len(solution[0])
+        used_cells = [(i, j) for i in range(m) for j in range(n)
+                     if solution[i][j] > 0]
+        used_cells.append((start_i, start_j))
         
-        # Pénalités des lignes
-        for i in range(m):
-            if supply[i] > 0:
-                valid_costs = costs[i, demand > 0]
-                if len(valid_costs) >= 2:
-                    penalties[i] = np.diff(np.partition(valid_costs, 1)[:2])[0]
+        def find_path(current: Tuple[int, int], 
+                     target: Tuple[int, int], 
+                     path: List[Tuple[int, int]], 
+                     visited: Set[Tuple[int, int]]) -> bool:
+            if current == target and len(path) > 3:
+                return True
                 
-        # Pénalités des colonnes
-        for j in range(n):
-            if demand[j] > 0:
-                valid_costs = costs[supply > 0, j]
-                if len(valid_costs) >= 2:
-                    penalties[m + j] = np.diff(np.partition(valid_costs, 1)[:2])[0]
+            i, j = current
+            # Essayer horizontalement
+            for next_j in range(n):
+                if next_j != j:
+                    next_cell = (i, next_j)
+                    if next_cell in used_cells and next_cell not in visited:
+                        path.append(next_cell)
+                        visited.add(next_cell)
+                        if find_path(next_cell, target, path, visited):
+                            return True
+                        path.pop()
+                        visited.remove(next_cell)
+                        
+            # Essayer verticalement
+            for next_i in range(m):
+                if next_i != i:
+                    next_cell = (next_i, j)
+                    if next_cell in used_cells and next_cell not in visited:
+                        path.append(next_cell)
+                        visited.add(next_cell)
+                        if find_path(next_cell, target, path, visited):
+                            return True
+                        path.pop()
+                        visited.remove(next_cell)
+                        
+            return False
         
-        # Trouver la plus grande pénalité
-        max_penalty_idx = np.argmax(penalties)
-        
-        if max_penalty_idx < m:  # Ligne
-            i = max_penalty_idx
-            valid_costs = np.where(demand > 0, costs[i], np.inf)
-            j = np.argmin(valid_costs)
-        else:  # Colonne
-            j = max_penalty_idx - m
-            valid_costs = np.where(supply > 0, costs[:, j], np.inf)
-            i = np.argmin(valid_costs)
-        
-        # Affecter la quantité maximum possible
-        quantity = min(supply[i], demand[j])
-        solution[i, j] = quantity
-        
-        # Mettre à jour l'offre et la demande
-        supply[i] -= quantity
-        demand[j] -= quantity
-    
-    return solution
+        path = [(start_i, start_j)]
+        visited = {(start_i, start_j)}
+        if find_path((start_i, start_j), (start_i, start_j), path, visited):
+            return path
+        return None

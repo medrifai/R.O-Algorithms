@@ -1,144 +1,153 @@
-from tkinter import ttk, messagebox
-import tkinter as tk
-from algorithms.graph_algorithms import *
-from algorithms.transport import *
-from utils.graph_utils import create_and_display_graph
+import networkx as nx
+import random
+from typing import Dict, List, Tuple, Set
+from config.settings import GRAPH_SETTINGS
 
-class BaseDialog:
-    def __init__(self, root):
-        self.dialog = tk.Toplevel(root)
-        self.dialog.geometry("300x200")
-        self.dialog.config(bg="#FFE4F2")
-        self.setup_dialog()
+class GraphAlgorithms:
+    @staticmethod
+    def welsh_powell(G: nx.Graph) -> Dict[int, int]:
+        """
+        Implémentation corrigée de l'algorithme de Welsh-Powell pour la coloration de graphe.
+        """
+        # Trier les nœuds par degré décroissant
+        nodes = sorted(G.nodes(), key=lambda x: G.degree(x), reverse=True)
+        colors = {}
+        max_color = 0
 
-    def setup_dialog(self):
-        raise NotImplementedError("Subclasses must implement setup_dialog")
-
-class WelshPowellDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Welsh Powell - Paramètres")
-        tk.Label(self.dialog, text="Nombre de sommets:", bg="#FFE4F2").pack(pady=10)
-        self.vertices_entry = tk.Entry(self.dialog)
-        self.vertices_entry.pack(pady=5)
-
-        tk.Button(self.dialog, text="Générer", command=self.generate_graph).pack(pady=20)
-
-    def generate_graph(self):
-        try:
-            num_vertices = int(self.vertices_entry.get())
-            if num_vertices <= 0:
-                raise ValueError("Le nombre de sommets doit être positif")
-            create_and_display_graph(num_vertices, "welsh_powell")
-            self.dialog.destroy()
-        except ValueError as e:
-            messagebox.showerror("Erreur", str(e))
-
-class DijkstraDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Dijkstra - Paramètres")
-        tk.Label(self.dialog, text="Sommet de départ:", bg="#FFE4F2").pack(pady=5)
-        self.start_entry = tk.Entry(self.dialog)
-        self.start_entry.pack(pady=5)
-
-        tk.Label(self.dialog, text="Sommet d'arrivée:", bg="#FFE4F2").pack(pady=5)
-        self.end_entry = tk.Entry(self.dialog)
-        self.end_entry.pack(pady=5)
-
-        tk.Button(self.dialog, text="Calculer", command=self.calculate_path).pack(pady=10)
-
-    def calculate_path(self):
-        try:
-            start = int(self.start_entry.get())
-            end = int(self.end_entry.get())
-            create_and_display_graph(max(start, end) + 1, "dijkstra", start_node=start, end_node=end)
-            self.dialog.destroy()
-        except ValueError as e:
-            messagebox.showerror("Erreur", "Veuillez entrer des nombres valides")
-
-class FordFulkersonDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Ford-Fulkerson - Paramètres")
-        tk.Label(self.dialog, text="Source:", bg="#FFE4F2").pack(pady=5)
-        self.source_entry = tk.Entry(self.dialog)
-        self.source_entry.pack(pady=5)
-
-        tk.Label(self.dialog, text="Puits:", bg="#FFE4F2").pack(pady=5)
-        self.sink_entry = tk.Entry(self.dialog)
-        self.sink_entry.pack(pady=5)
-
-        tk.Button(self.dialog, text="Calculer", command=self.calculate_flow).pack(pady=10)
-
-    def calculate_flow(self):
-        try:
-            source = int(self.source_entry.get())
-            sink = int(self.sink_entry.get())
-            create_and_display_graph(max(source, sink) + 1, "ford_fulkerson", source=source, sink=sink)
-            self.dialog.destroy()
-        except ValueError:
-            messagebox.showerror("Erreur", "Veuillez entrer des nombres valides")
-
-class TransportDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Problème de Transport - Paramètres")
-        tk.Label(self.dialog, text="Nombre de sources:", bg="#FFE4F2").pack(pady=5)
-        self.sources_entry = tk.Entry(self.dialog)
-        self.sources_entry.pack(pady=5)
-
-        tk.Label(self.dialog, text="Nombre de destinations:", bg="#FFE4F2").pack(pady=5)
-        self.destinations_entry = tk.Entry(self.dialog)
-        self.destinations_entry.pack(pady=5)
-
-        algorithms = ["Nord Ouest", "Moindre Coût", "Stepping Stone"]
-        self.selected_algo = tk.StringVar(value=algorithms[0])
-        tk.OptionMenu(self.dialog, self.selected_algo, *algorithms).pack(pady=5)
-
-        tk.Button(self.dialog, text="Générer", command=self.generate_problem).pack(pady=10)
-
-    def generate_problem(self):
-        try:
-            sources = int(self.sources_entry.get())
-            destinations = int(self.destinations_entry.get())
-            if sources <= 0 or destinations <= 0:
-                raise ValueError("Les nombres doivent être positifs")
+        for node in nodes:
+            # Obtenir les couleurs utilisées par les voisins
+            neighbor_colors = {colors.get(neighbor) for neighbor in G.neighbors(node) 
+                             if neighbor in colors}
             
-            algorithm = self.selected_algo.get().lower().replace(" ", "_")
-            create_and_display_graph(0, algorithm, sources=sources, destinations=destinations)
-            self.dialog.destroy()
-        except ValueError as e:
-            messagebox.showerror("Erreur", str(e))
+            # Trouver la première couleur disponible
+            color = 0
+            while color in neighbor_colors:
+                color += 1
+            
+            colors[node] = color
+            max_color = max(max_color, color)
 
-class BellmanFordDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Bellman-Ford - Paramètres")
-        tk.Label(self.dialog, text="Sommet de départ:", bg="#FFE4F2").pack(pady=5)
-        self.start_entry = tk.Entry(self.dialog)
-        self.start_entry.pack(pady=5)
+        return colors, max_color + 1
 
-        tk.Button(self.dialog, text="Calculer", command=self.calculate_distances).pack(pady=10)
-
-    def calculate_distances(self):
+    @staticmethod
+    def dijkstra(G: nx.Graph, start: str, end: str) -> Tuple[List[str], float]:
+        """
+        Implémentation corrigée de l'algorithme de Dijkstra.
+        """
         try:
-            start = int(self.start_entry.get())
-            create_and_display_graph(start + 5, "bellman_ford", start_node=start)
-            self.dialog.destroy()
-        except ValueError:
-            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide")
+            path = nx.dijkstra_path(G, start, end, weight='weight')
+            path_length = nx.dijkstra_path_length(G, start, end, weight='weight')
+            return path, path_length
+        except nx.NetworkXNoPath:
+            raise ValueError("Aucun chemin n'existe entre les sommets spécifiés")
 
-class PotentielMetraDialog(BaseDialog):
-    def setup_dialog(self):
-        self.dialog.title("Potentiel METRA - Paramètres")
-        tk.Label(self.dialog, text="Nombre d'activités:", bg="#FFE4F2").pack(pady=5)
-        self.activities_entry = tk.Entry(self.dialog)
-        self.activities_entry.pack(pady=5)
+    @staticmethod
+    def kruskal(G: nx.Graph) -> Tuple[List[Tuple[int, int]], float]:
+        """
+        Implémentation corrigée de l'algorithme de Kruskal.
+        """
+        mst = nx.minimum_spanning_tree(G, algorithm='kruskal')
+        mst_edges = list(mst.edges(data=True))
+        total_weight = sum(data['weight'] for _, _, data in mst_edges)
+        return mst_edges, total_weight
 
-        tk.Button(self.dialog, text="Générer", command=self.generate_network).pack(pady=10)
-
-    def generate_network(self):
+    @staticmethod
+    def ford_fulkerson(G: nx.DiGraph, source: int, sink: int) -> Tuple[float, Dict]:
+        """
+        Implémentation corrigée de l'algorithme de Ford-Fulkerson.
+        """
         try:
-            activities = int(self.activities_entry.get())
-            if activities <= 0:
-                raise ValueError("Le nombre d'activités doit être positif")
-            create_and_display_graph(activities, "potentiel_metra")
-            self.dialog.destroy()
-        except ValueError as e:
-            messagebox.showerror("Erreur", str(e))
+            flow_value, flow_dict = nx.maximum_flow(G, source, sink)
+            cut_value, partition = nx.minimum_cut(G, source, sink)
+            return flow_value, flow_dict, cut_value, partition
+        except nx.NetworkXError:
+            raise ValueError("Le graphe doit être dirigé avec des capacités valides")
+
+    @staticmethod
+    def potentiel_metra(tasks: Dict[int, Dict]) -> Tuple[Dict[int, int], int]:
+        """
+        Implémentation corrigée de la méthode METRA (calcul des dates au plus tôt).
+        """
+        G = nx.DiGraph()
+        
+        # Créer le graphe
+        for task_id, task_info in tasks.items():
+            G.add_node(task_id, duration=task_info['duration'])
+            for pred in task_info['predecessors']:
+                G.add_edge(pred, task_id)
+
+        # Vérifier s'il y a des cycles
+        if not nx.is_directed_acyclic_graph(G):
+            raise ValueError("Le graphe des tâches contient des cycles")
+
+        # Calculer les dates au plus tôt
+        early_dates = {0: 0}
+        for task in nx.topological_sort(G):
+            if task not in early_dates:
+                early_dates[task] = 0
+            task_duration = tasks[task]['duration']
+            for pred in tasks[task]['predecessors']:
+                early_dates[task] = max(early_dates[task],
+                                      early_dates[pred] + tasks[pred]['duration'])
+
+        # Calculer la durée totale du projet
+        project_duration = max(early_dates[task] + tasks[task]['duration'] 
+                             for task in tasks)
+
+        return early_dates, project_duration
+
+    @staticmethod
+    def generate_random_graph(num_vertices: int, algorithm_type: str) -> nx.Graph:
+        """
+        Génère un graphe aléatoire adapté à l'algorithme spécifié.
+        """
+        if algorithm_type == "welsh_powell":
+            G = nx.Graph()
+            # Assurer la connexité
+            for i in range(num_vertices):
+                G.add_node(i)
+            for i in range(1, num_vertices):
+                G.add_edge(i-1, i)
+            
+            # Ajouter des arêtes aléatoires
+            for i in range(num_vertices):
+                for j in range(i + 2, num_vertices):
+                    if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
+                        G.add_edge(i, j)
+            return G
+
+        elif algorithm_type in ["dijkstra", "kruskal"]:
+            G = nx.Graph()
+            for i in range(num_vertices):
+                G.add_node(f'X{i}')
+            # Assurer la connexité avec des poids
+            for i in range(num_vertices - 1):
+                weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
+                                     GRAPH_SETTINGS['MAX_WEIGHT'])
+                G.add_edge(f'X{i}', f'X{i+1}', weight=weight)
+            # Ajouter des arêtes supplémentaires
+            for i in range(num_vertices):
+                for j in range(i + 2, num_vertices):
+                    if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
+                        weight = random.randint(GRAPH_SETTINGS['MIN_WEIGHT'],
+                                             GRAPH_SETTINGS['MAX_WEIGHT'])
+                        G.add_edge(f'X{i}', f'X{j}', weight=weight)
+            return G
+
+        elif algorithm_type == "ford_fulkerson":
+            G = nx.DiGraph()
+            for i in range(num_vertices):
+                G.add_node(i)
+            # Assurer la connexité avec des capacités
+            for i in range(num_vertices - 1):
+                capacity = random.randint(1, 20)
+                G.add_edge(i, i+1, capacity=capacity)
+            # Ajouter des arcs supplémentaires
+            for i in range(num_vertices):
+                for j in range(i + 2, num_vertices):
+                    if random.random() < GRAPH_SETTINGS['RANDOM_EDGE_PROBABILITY']:
+                        capacity = random.randint(1, 20)
+                        G.add_edge(i, j, capacity=capacity)
+            return G
+
+        raise ValueError(f"Type d'algorithme non supporté: {algorithm_type}")

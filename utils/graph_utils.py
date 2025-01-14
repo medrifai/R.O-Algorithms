@@ -1,122 +1,277 @@
 import networkx as nx
+import numpy as np
+import tkinter as tk
+from tkinter import messagebox 
 import matplotlib.pyplot as plt
-import random
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from config.settings import GRAPH_SETTINGS, ALGORITHM_COLORS
 
-def create_and_display_graph(num_vertices, algorithm, **kwargs):
-    """
-    Create and display a graph based on the algorithm type and parameters.
-    
-    Parameters:
-    -----------
-    num_vertices : int
-        Number of vertices in the graph
-    algorithm : str
-        Type of algorithm ('dijkstra', 'ford_fulkerson', etc.)
-    **kwargs : dict
-        Additional algorithm-specific parameters
-    """
-    G = nx.DiGraph() if algorithm in ['dijkstra', 'ford_fulkerson', 'bellman_ford'] else nx.Graph()
-    
-    # Add nodes
-    G.add_nodes_from(range(num_vertices))
-    
-    if algorithm == 'dijkstra':
-        # Generate random edges for Dijkstra
-        edges = [(i, j, {'weight': random.randint(1, 10)}) 
-                for i in range(num_vertices) 
-                for j in range(i+1, num_vertices) 
-                if random.random() < 0.3]
-        G.add_edges_from(edges)
-        # Highlight path if start and end nodes are provided
-        if 'start_node' in kwargs and 'end_node' in kwargs:
-            try:
-                path = nx.shortest_path(G, kwargs['start_node'], kwargs['end_node'], weight='weight')
-                for i in range(len(path)-1):
-                    G[path[i]][path[i+1]]['color'] = 'red'
-            except nx.NetworkXNoPath:
-                print("No path exists between the specified nodes.")
-    
-    elif algorithm == 'ford_fulkerson':
-        # Generate random edges for Ford-Fulkerson
-        source = kwargs.get('source', 0)
-        sink = kwargs.get('sink', num_vertices-1)
-        for i in range(num_vertices):
-            for j in range(i+1, num_vertices):
-                if random.random() < 0.3:
-                    G.add_edge(i, j, weight=random.randint(1, 10))
-    
-    elif algorithm in ['nord_ouest', 'moindre_cout', 'stepping_stone']:
-        # Create bipartite graph for transport problems
-        sources = kwargs.get('sources', 3)
-        destinations = kwargs.get('destinations', 3)
-        G = nx.complete_bipartite_graph(sources, destinations)
-        pos = {}
-        # Position sources on left
-        for i in range(sources):
-            pos[i] = (0, i)
-        # Position destinations on right
-        for i in range(sources, sources + destinations):
-            pos[i] = (1, i - sources)
+class GraphVisualizer:
+    def __init__(self):
+        self.window = None
+        self.fig = None
+
+    def _create_window(self, title):
+        self.window = tk.Toplevel()
+        self.window.title(title)
+        self.window.geometry("800x800")
         
-        # Add random weights
-        for (u, v) in G.edges():
-            G[u][v]['weight'] = random.randint(1, 10)
-            
-        nx.draw(G, pos=pos, with_labels=True, 
-                node_color='lightblue', node_size=500, 
-                font_size=10, font_weight='bold')
-        edge_labels = nx.get_edge_attributes(G, 'weight')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-        plt.show()
-        return G
-    
-    # Default graph visualization for other algorithms
-    pos = nx.spring_layout(G)
-    nx.draw(G, pos, with_labels=True, 
-            node_color='lightblue', node_size=500, 
-            font_size=10, font_weight='bold', 
-            arrows=isinstance(G, nx.DiGraph))
-    
-    # Draw edge weights
-    edge_labels = nx.get_edge_attributes(G, 'weight')
-    if edge_labels:
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    
-    # Draw edge colors if specified
-    edge_colors = nx.get_edge_attributes(G, 'color').values()
-    if edge_colors:
-        nx.draw_networkx_edges(G, pos, 
-                             edge_color=list(edge_colors), 
-                             width=2)
-    
-    plt.show()
-    return G
+        main_frame = tk.Frame(self.window)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        plt.clf()  # Nettoyer la figure précédente
+        self.fig, self.ax = plt.subplots(figsize=GRAPH_SETTINGS['FIGURE_SIZE'])
+        return main_frame, self.ax  # Retourner aussi l'axe
 
-def display_graph(G, with_weights=True):
-    """
-    Display an existing networkx graph.
-    
-    Parameters:
-    -----------
-    G : networkx.Graph or networkx.DiGraph
-        The graph to display
-    with_weights : bool, optional
-        Whether to display edge weights (default: True)
-    """
-    plt.figure(figsize=(10, 8))
-    pos = nx.spring_layout(G)
-    
-    nx.draw(G, pos,
-            with_labels=True,
-            node_color='lightblue',
-            node_size=500,
-            font_size=10,
-            font_weight='bold',
-            arrows=isinstance(G, nx.DiGraph))
-    
-    if with_weights:
+    def _add_info_and_close(self, main_frame, info_text):
+        # Vérification si main_frame est un tuple
+        if isinstance(main_frame, tuple):
+            main_frame = main_frame[0]
+
+        canvas = FigureCanvasTkAgg(self.fig, master=main_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Ajouter les informations
+        info_label = tk.Label(main_frame, text=info_text, 
+                            font=("Arial", 12), wraplength=700)
+        info_label.pack(pady=10)
+
+        # Bouton de fermeture
+        close_button = tk.Button(main_frame, text="Fermer",
+                                command=self.window.destroy)
+        close_button.pack(pady=10)
+
+
+    def display_welsh_powell(self, G, colors, num_colors):
+        main_frame = self._create_window("Coloration de graphe - Welsh Powell")
+        pos = nx.spring_layout(G)
+        nx.draw(G, pos, node_color=[colors[node] for node in G.nodes()],
+               with_labels=True, node_size=GRAPH_SETTINGS['NODE_SIZE'],
+               cmap=plt.cm.rainbow)
+        self._add_info_and_close(main_frame, f"Nombre de couleurs utilisées: {num_colors}")
+
+    def display_dijkstra(self, G, path, path_length):
+        main_frame = self._create_window("Plus court chemin - Dijkstra")
+        pos = nx.spring_layout(G)
+        
+        nx.draw_networkx_edges(G, pos, alpha=0.2)
+        nx.draw_networkx_nodes(G, pos, node_size=GRAPH_SETTINGS['NODE_SIZE'],
+                             node_color=ALGORITHM_COLORS['dijkstra']['node_default'])
+        
+        path_edges = list(zip(path[:-1], path[1:]))
+        nx.draw_networkx_edges(G, pos, edgelist=path_edges,
+                             edge_color=ALGORITHM_COLORS['dijkstra']['path_highlight'],
+                             width=GRAPH_SETTINGS['EDGE_WIDTH'])
+        
+        nx.draw_networkx_labels(G, pos)
         edge_labels = nx.get_edge_attributes(G, 'weight')
-        if edge_labels:
-            nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    
-    plt.show()
+        nx.draw_networkx_edge_labels(G, pos, edge_labels)
+        
+        info_text = f"Plus court chemin: {' -> '.join(map(str, path))}\nDistance totale: {path_length}"
+        self._add_info_and_close(main_frame, info_text)
+
+    def display_kruskal(self, G, mst_edges, total_weight):
+        main_frame = self._create_window("Arbre couvrant minimal - Kruskal")
+        pos = nx.spring_layout(G)
+        
+        nx.draw_networkx_edges(G, pos, alpha=0.2)
+        nx.draw_networkx_nodes(G, pos, node_size=GRAPH_SETTINGS['NODE_SIZE'])
+        
+        mst_edge_list = [(u, v) for u, v, _ in mst_edges]
+        nx.draw_networkx_edges(G, pos, edgelist=mst_edge_list,
+                             edge_color=ALGORITHM_COLORS['kruskal']['mst_highlight'],
+                             width=GRAPH_SETTINGS['EDGE_WIDTH'])
+        
+        nx.draw_networkx_labels(G, pos)
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels)
+        
+        info_text = f"Coût total de l'arbre couvrant minimal: {total_weight}"
+        self._add_info_and_close(main_frame, info_text)
+
+    def display_ford_fulkerson(self, G, flow_dict, flow_value, partition):
+        main_frame = self._create_window("Flot maximum - Ford-Fulkerson")
+        pos = nx.spring_layout(G)
+        reachable, non_reachable = partition
+        
+        nx.draw_networkx_nodes(G, pos, nodelist=reachable,
+                             node_color=ALGORITHM_COLORS['ford_fulkerson']['source_node'],
+                             node_size=GRAPH_SETTINGS['NODE_SIZE'])
+        nx.draw_networkx_nodes(G, pos, nodelist=non_reachable,
+                             node_color=ALGORITHM_COLORS['ford_fulkerson']['sink_node'],
+                             node_size=GRAPH_SETTINGS['NODE_SIZE'])
+        
+        nx.draw_networkx_edges(G, pos,
+                             edge_color=ALGORITHM_COLORS['ford_fulkerson']['edge_default'],
+                             arrows=True, arrowsize=20)
+        
+        nx.draw_networkx_labels(G, pos)
+        
+        edge_labels = {}
+        for u, v, data in G.edges(data=True):
+            flow = flow_dict[u][v]
+            capacity = data['capacity']
+            edge_labels[(u, v)] = f'{flow}/{capacity}'
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        
+        info_text = f"Flot maximum: {flow_value}"
+        self._add_info_and_close(main_frame, info_text)
+        
+    def display_transport_solution(self, supply, demand, costs, solution, total_cost, method_name):
+        """
+        Affiche la solution du problème de transport avec le nom de la méthode utilisée.
+        
+        Args:
+            method_name: str - 'nord_ouest', 'moindre_cout', ou 'stepping_stone'
+        """
+        method_titles = {
+            'nord_ouest': 'Méthode du Nord-Ouest',
+            'moindre_cout': 'Méthode du Moindre Coût',
+            'stepping_stone': 'Méthode du Stepping Stone'
+        }
+        
+        title = method_titles.get(method_name, 'Solution du problème de transport')
+        main_frame, ax = self._create_window(title)
+        
+        # Préparer les données du tableau
+        cell_text = []
+        col_labels = ['Sources'] + [f'D{j+1}' for j in range(len(demand))] + ['Offre']
+        
+        # Données des cellules avec coûts et quantités
+        total_allocated = 0
+        for i in range(len(supply)):
+            row = [f'S{i+1}']
+            row_cost = 0
+            row_quantity = 0
+            for j in range(len(demand)):
+                quantity = solution[i][j]
+                cost = costs[i][j]
+                cell_cost = quantity * cost
+                row_cost += cell_cost
+                row_quantity += quantity
+                row.append(f'{quantity}\n({cost})\n={cell_cost}')
+            row.append(f'{supply[i]}\n({row_cost})')
+            total_allocated += row_quantity
+            cell_text.append(row)
+        
+        # Ligne de demande avec totaux
+        demand_row = ['Demande']
+        for j in range(len(demand)):
+            col_cost = sum(solution[i][j] * costs[i][j] for i in range(len(supply)))
+            demand_row.append(f'{demand[j]}\n({col_cost})')
+        demand_row.append(f'{sum(demand)}\n({total_cost})')
+        cell_text.append(demand_row)
+        
+        # Créer et personnaliser le tableau
+        table = ax.table(cellText=cell_text,
+                        colLabels=col_labels,
+                        loc='center',
+                        cellLoc='center',
+                        bbox=[0.1, 0.1, 0.8, 0.8])
+        
+        # Personnalisation
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.2, 1.5)
+        
+        # Masquer les axes
+        ax.axis('off')
+        
+        # Titre
+        ax.set_title(f"Solution du problème de transport - {title}")
+        
+        # Information détaillée selon la méthode
+        method_info = {
+            'nord_ouest': "Allocation séquentielle depuis le coin nord-ouest",
+            'moindre_cout': "Allocation prioritaire aux coûts minimaux",
+            'stepping_stone': "Solution optimisée par la méthode du Stepping Stone"
+        }
+        
+        info_text = (
+            f"Méthode utilisée: {title}\n"
+            f"{method_info.get(method_name, '')}\n"
+            f"Coût total de transport: {total_cost}\n"
+            f"Quantité totale transportée: {total_allocated}\n"
+            f"Coût moyen par unité: {total_cost/total_allocated:.2f}\n"
+            f"Offre totale: {sum(supply)}\n"
+            f"Demande totale: {sum(demand)}"
+        )
+        
+        self._add_info_and_close(main_frame, info_text)
+        
+    def display_potentiel_metra(self, tasks, early_dates, project_duration):
+        main_frame, ax = self._create_window("Potentiel Metra - Diagramme PERT")
+        
+        # Créer un graphe dirigé
+        G = nx.DiGraph()
+        
+        # Créer les nœuds pour chaque événement (il y a n+1 événements pour n tâches)
+        num_events = len(tasks) + 1
+        for i in range(num_events):
+            G.add_node(i)
+        
+        # Ajouter les arcs (tâches)
+        for i, task in enumerate(tasks):
+            G.add_edge(i, i+1, 
+                    task=task,
+                    duration=early_dates[i])
+        
+        # Positionner les nœuds de gauche à droite
+        pos = {}
+        for i in range(num_events):
+            pos[i] = (i * 2, 0)  # Espacement horizontal régulier
+        
+        # Dessiner les nœuds (événements)
+        nx.draw_networkx_nodes(G, pos,
+                            node_color='white',
+                            node_size=1500,
+                            edgecolors='black')
+        
+        # Dessiner les arcs (tâches)
+        nx.draw_networkx_edges(G, pos,
+                            edge_color='black',
+                            arrows=True,
+                            arrowsize=20)
+        
+        # Labels des nœuds
+        node_labels = {i: f"E{i}" for i in range(num_events)}
+        nx.draw_networkx_labels(G, pos, node_labels, font_size=10)
+        
+        # Labels des arcs (tâches et durées)
+        edge_labels = {}
+        for i, (task, duration) in enumerate(zip(tasks, early_dates)):
+            edge_labels[(i, i+1)] = f"{task}\n{duration}j"
+        nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=8)
+        
+        plt.title("Diagramme PERT")
+        
+        info_text = (
+            f"Nombre de tâches: {len(tasks)}\n"
+            f"Durée totale du projet: {project_duration} jours\n"
+            "Les nœuds représentent les événements\n"
+            "Les arcs représentent les tâches avec leurs durées"
+        )
+        
+        self._add_info_and_close(main_frame, info_text)
+
+
+class GraphGenerator:
+    @staticmethod
+    def create_random_graph(num_nodes=8):
+        """Crée un graphe aléatoire avec des poids et des capacités."""
+        G = nx.gnm_random_graph(num_nodes, num_nodes * 2)
+        
+        for (u, v) in G.edges():
+            G[u][v]['weight'] = np.random.randint(1, 10)
+            G[u][v]['capacity'] = np.random.randint(1, 10)
+        
+        return G
+
+    @staticmethod
+    def load_graph_from_file(filename):
+        """Charge un graphe depuis un fichier GraphML."""
+        try:
+            return nx.read_graphml(filename)
+        except Exception as e:
+            raise ValueError(f"Erreur lors du chargement du graphe : {str(e)}")
